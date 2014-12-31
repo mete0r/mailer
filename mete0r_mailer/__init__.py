@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-#   MYAPP : SOME_DESCRIPTION
+#   mete0r.mailer : mete0r's mailer
 #   Copyright (C) 2014 mete0r <mete0r@sarangbang.or.kr>
 #
 #   This program is free software: you can redistribute it and/or modify

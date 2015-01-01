@@ -18,7 +18,7 @@
 #
 from contextlib import closing
 from email.header import Header
-from email.message import Message
+from email.MIMEText import MIMEText
 from email.utils import getaddresses
 import json
 import logging
@@ -34,27 +34,39 @@ from .mailer import SMTPLazyConnectMailer
 logger = logging.getLogger(__name__)
 
 
-def main():
+def qb():
     logging.basicConfig(level=logging.INFO)
     with file(sys.argv[1]) as f:
         settings = json.load(f)
     connector = connector_from_settings(settings, prefix='')
+    mailqueue = settings.get('mailqueue', 'Maildir')
     with closing(SMTPLazyConnectMailer(connector)) as mailer:
-        qp = QueueProcessor(mailer, 'Maildir')
+        qp = QueueProcessor(mailer, mailqueue)
         qp.send_messages()
 
 
-def populate_test():
+def mail():
+    logging.basicConfig(level=logging.INFO)
+    with file(sys.argv[1]) as f:
+        settings = json.load(f)
+    mailqueue = settings.get('mailqueue', 'Maildir')
+
     import transaction
     transaction.manager.begin()
     try:
-        delivery = QueuedMailDelivery('Maildir')
+        delivery = QueuedMailDelivery(mailqueue)
 
-        message = Message()
-        message['Subject'] = Header('테스트', 'utf-8')
-        message['From'] = sys.argv[1]
-        addresses = sys.argv[2:]
-        message['To'] = ', '.join(addresses)
+        from_addr = sys.argv[2]
+        to_addrs = sys.argv[3:]
+        subject = raw_input('Subject: ')
+        sys.stderr.write('Content:\n')
+        content = sys.stdin.read()
+
+        message = MIMEText(content, 'plain', 'UTF-8')
+        message['Subject'] = Header(subject, 'utf-8')
+        message['From'] = from_addr
+        message['To'] = ', '.join(to_addrs)
+
         deliver(delivery, message)
         transaction.manager.commit()
     except:

@@ -84,8 +84,8 @@ setup_info = {
     ],
     'entry_points': {
         'console_scripts': [
-            'gmailer = mete0r_mailer.cli:main',
-            'gmailer-populate-test = mete0r_mailer.cli:populate_test',
+            'mete0r-mailer-qb = mete0r_mailer.cli:qb',
+            'mete0r-mailer-mail = mete0r_mailer.cli:mail',
         ],
     }
 }

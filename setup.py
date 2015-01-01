@@ -79,7 +79,7 @@ setup_info = {
     ],
     'package_dir': {'': '.'},
     'install_requires': [
-        'repoze.sendmail',
+        'repoze.sendmail == 4.1',
         'requests',
     ],
     'entry_points': {

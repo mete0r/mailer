@@ -16,7 +16,6 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from contextlib import closing
 from email.header import Header
 from email.MIMEText import MIMEText
 from email.utils import getaddresses
@@ -24,12 +23,12 @@ import json
 import logging
 import sys
 
-from repoze.sendmail.delivery import QueuedMailDelivery
 from repoze.sendmail.queue import QueueProcessor
 
 from .connector import connector_from_settings
-from .mailer import SMTPLazyConnectMailer
 from .delivery import delivery_from_settings
+from .mailer import SMTPConnectionMailer
+from .mailer import connect
 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +40,8 @@ def qb():
         settings = json.load(f)
     connector = connector_from_settings(settings, prefix='qb.')
     mailqueue = settings.get('qb.mailqueue', 'Maildir')
-    with closing(SMTPLazyConnectMailer(connector)) as mailer:
+    with connect(connector) as connection:
+        mailer = SMTPConnectionMailer(connection)
         qp = QueueProcessor(mailer, mailqueue)
         qp.send_messages()
 

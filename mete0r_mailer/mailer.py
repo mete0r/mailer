@@ -45,37 +45,6 @@ class SMTPConnectionMailer(object):
         logger.info('Sending message...')
         self.connection.sendmail(fromaddr, toaddrs, message)
 
-    def close(self):
-        logger.info('Closing connection...')
-        try:
-            self.connection.quit()
-        except SSLError:
-            # something weird happened while quiting
-            self.connection.close()
-
-
-@implementer(IMailer)
-class SMTPLazyConnectMailer(object):
-
-    def __init__(self, connector):
-        self.connector = connector
-        self._connectionmailer = None
-
-    @property
-    def connectionmailer(self):
-        if self._connectionmailer is None:
-            logger.info('Getting new connection...')
-            connection = self.connector.connect()
-            self._connectionmailer = SMTPConnectionMailer(connection)
-        return self._connectionmailer
-
-    def send(self, fromaddr, toaddrs, message):
-        return self.connectionmailer.send(fromaddr, toaddrs, message)
-
-    def close(self):
-        if self._connectionmailer:
-            self._connectionmailer.close()
-
 
 @implementer(IMailer)
 class SMTPConnectMailer(object):

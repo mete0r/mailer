@@ -24,6 +24,7 @@ import logging
 import sys
 
 from repoze.sendmail.queue import QueueProcessor
+import transaction
 
 from .connector import connector_from_settings
 from .delivery import delivery_from_settings
@@ -53,9 +54,7 @@ def mail():
 
     delivery = delivery_from_settings(settings, 'mail.')
 
-    import transaction
-    transaction.manager.begin()
-    try:
+    with transaction.manager:
         from_addr = sys.argv[2]
         to_addrs = sys.argv[3:] or [from_addr]
         subject = raw_input('Subject: ')
@@ -68,10 +67,6 @@ def mail():
         message['To'] = ', '.join(to_addrs)
 
         deliver(delivery, message)
-        transaction.manager.commit()
-    except:
-        transaction.manager.abort()
-        raise
 
 
 def deliver(delivery, message):

@@ -16,8 +16,17 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import subprocess
+from datetime import datetime
+from datetime import timedelta
 import json
+import logging
+import subprocess
+import urllib
+
+import requests
+
+
+logger = logging.getLogger(__name__)
 
 
 XOAUTH2_SCOPE = 'https://mail.google.com/'
@@ -30,3 +39,64 @@ class XOAuth2GOAuthc(object):
         result = subprocess.check_output(cmd)
         credentials = json.loads(result)
         return credentials['access_token']
+
+
+class XOAuth2Offline(object):
+
+    def __init__(self, client_id, client_secret, accounts):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.accounts = accounts
+        self.authorized = {}
+        for email in accounts:
+            self.authorized[email] = {
+                'expires_at': None,
+                'access_token': None,
+            }
+
+    def get_refresh_token(self, email):
+        account = self.accounts[email]
+        return account['refresh_token']
+
+    def is_expired(self, email):
+        authorized = self.authorized[email]
+        expires_at = authorized['expires_at']
+        access_token = authorized['access_token']
+
+        if access_token is None or expires_at is None:
+            return True
+        return expires_at < datetime.now()
+
+    def authorize(self, email):
+        if self.is_expired(email):
+            refresh_token = self.accounts[email]['refresh_token']
+            credentials = self.refresh(refresh_token)
+            logger.info('credentials: %s',
+                        json.dumps(credentials, sort_keys=True, indent=2))
+            expires_in = int(credentials['expires_in'])
+            self.authorized[email] = {
+                'access_token': credentials['access_token'],
+                'expires_at': datetime.now() + timedelta(seconds=expires_in),
+            }
+        return self.authorized[email]['access_token']
+
+    def refresh(self, refresh_token):
+        endpoint = 'https://accounts.google.com/o/oauth2/token'
+        query = {
+            'grant_type': 'refresh_token',
+            'client_id': self.client_id,
+            'client_secret': self.client_secret,
+            'refresh_token': refresh_token
+        }
+
+        logger.info('google refresh_token query: %s',
+                    json.dumps(query, indent=2, sort_keys=True))
+
+        query = urllib.urlencode(query)
+        r = requests.post(endpoint, data=query, headers={
+            'content-type': 'application/x-www-form-urlencoded'
+        })
+        resp = r.json()
+        if 'error' in resp:
+            raise RuntimeError(resp['error'])
+        return resp

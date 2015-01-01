@@ -80,6 +80,7 @@ setup_info = {
     'package_dir': {'': '.'},
     'install_requires': [
         'repoze.sendmail',
+        'requests',
     ],
     'entry_points': {
         'console_scripts': [

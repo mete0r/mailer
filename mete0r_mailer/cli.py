@@ -29,6 +29,7 @@ from repoze.sendmail.queue import QueueProcessor
 
 from .connector import connector_from_settings
 from .mailer import SMTPLazyConnectMailer
+from .delivery import delivery_from_settings
 
 
 logger = logging.getLogger(__name__)
@@ -38,8 +39,8 @@ def qb():
     logging.basicConfig(level=logging.INFO)
     with file(sys.argv[1]) as f:
         settings = json.load(f)
-    connector = connector_from_settings(settings, prefix='')
-    mailqueue = settings.get('mailqueue', 'Maildir')
+    connector = connector_from_settings(settings, prefix='qb.')
+    mailqueue = settings.get('qb.mailqueue', 'Maildir')
     with closing(SMTPLazyConnectMailer(connector)) as mailer:
         qp = QueueProcessor(mailer, mailqueue)
         qp.send_messages()
@@ -49,15 +50,14 @@ def mail():
     logging.basicConfig(level=logging.INFO)
     with file(sys.argv[1]) as f:
         settings = json.load(f)
-    mailqueue = settings.get('mailqueue', 'Maildir')
+
+    delivery = delivery_from_settings(settings, 'mail.')
 
     import transaction
     transaction.manager.begin()
     try:
-        delivery = QueuedMailDelivery(mailqueue)
-
         from_addr = sys.argv[2]
-        to_addrs = sys.argv[3:]
+        to_addrs = sys.argv[3:] or [from_addr]
         subject = raw_input('Subject: ')
         sys.stderr.write('Content:\n')
         content = sys.stdin.read()

@@ -36,9 +36,9 @@ def authorizer_from_settings(settings, prefix):
     authorizer_type = settings.get(prefix + 'authorizer')
     logger.info('authorizer: %s', authorizer_type)
     if authorizer_type == 'XOAuth2GOAuthc':
-        return XOAuth2GOAuthc.from_settings(settings)
+        return XOAuth2GOAuthc.from_settings(settings, prefix + 'authorizer.')
     elif authorizer_type == 'XOAuth2Offline':
-        return XOAuth2Offline.from_settings(settings)
+        return XOAuth2Offline.from_settings(settings, prefix + 'authorizer.')
     raise ValueError(authorizer_type)
 
 
@@ -48,8 +48,8 @@ class XOAuth2GOAuthc(object):
         self.goauthc_path = goauthc_path
 
     @classmethod
-    def from_settings(cls, settings):
-        goauthc_path = settings.get('xoauth2_goauthc.goauthc_path',
+    def from_settings(cls, settings, prefix='xoauth2_goauthc.'):
+        goauthc_path = settings.get(prefix + 'goauthc_path',
                                     'goauthc')
         return cls(goauthc_path)
 
@@ -75,8 +75,8 @@ class XOAuth2Offline(object):
             }
 
     @classmethod
-    def from_settings(cls, settings):
-        path = settings.get('xoauth2_offline.credentials_path')
+    def from_settings(cls, settings, prefix='xoauth2_offline.'):
+        path = settings.get(prefix + 'credentials_path')
         with file(path) as f:
             d = json.load(f)
         return cls(client_id=d['client_id'],

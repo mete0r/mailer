@@ -16,6 +16,7 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+from contextlib import contextmanager
 from email.message import Message
 import logging
 
@@ -23,6 +24,8 @@ from zope.interface import implementer
 from repoze.sendmail.encoding import encode_message
 from repoze.sendmail.interfaces import IMailer
 from repoze.sendmail._compat import SSLError
+
+from .connector import connector_from_settings
 
 
 logger = logging.getLogger(__name__)
@@ -72,3 +75,36 @@ class SMTPLazyConnectMailer(object):
     def close(self):
         if self._connectionmailer:
             self._connectionmailer.close()
+
+
+@implementer(IMailer)
+class SMTPConnectMailer(object):
+
+    def __init__(self, connector):
+        self.connector = connector
+
+    @classmethod
+    def from_settings(cls, settings, prefix='smtp_connect_mailer.'):
+        connector = connector_from_settings(settings, prefix)
+        return cls(connector)
+
+    def send(self, fromaddr, toaddrs, message):
+        with connect(self.connector) as connection:
+            connectionmailer = SMTPConnectionMailer(connection)
+            return connectionmailer.send(fromaddr, toaddrs, message)
+
+
+@contextmanager
+def connect(connector):
+    logger.info('Getting new connection...')
+
+    connection = connector.connect()
+    try:
+        yield connection
+    finally:
+        logger.info('Closing connection...')
+        try:
+            connection.quit()
+        except SSLError:
+            # something weird happened while quiting
+            connection.close()

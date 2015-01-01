@@ -30,7 +30,7 @@ def connector_from_settings(settings, prefix):
     connector_type = settings.get(prefix + 'connector')
     logger.info('connector: %s', connector_type)
     if connector_type == 'XOAuth2Connector':
-        return XOAuth2Connector.from_settings(settings)
+        return XOAuth2Connector.from_settings(settings, prefix + 'connector.')
     raise ValueError(connector_type)
 
 
@@ -48,12 +48,12 @@ class XOAuth2Connector(object):
         self.debug_smtp = debug_smtp
 
     @classmethod
-    def from_settings(cls, settings):
-        username = settings.get('xoauth2_connector.username')
-        authorizer = authorizer_from_settings(settings, 'xoauth2_connector.')
-        hostname = settings.get('xoauth2_connector.hostname', 'smtp.gmail.com')
-        port = int(settings.get('xoauth2_connector.port', 587))
-        timeout = int(settings.get('xoauth2_connector.timeout', 10))
+    def from_settings(cls, settings, prefix='xoauth2_connector.'):
+        username = settings.get(prefix + 'username')
+        authorizer = authorizer_from_settings(settings, prefix)
+        hostname = settings.get(prefix + 'hostname', 'smtp.gmail.com')
+        port = int(settings.get(prefix + 'port', 587))
+        timeout = int(settings.get(prefix + 'timeout', 10))
         return cls(username=username,
                    authorizer=authorizer,
                    hostname=hostname,

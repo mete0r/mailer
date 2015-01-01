@@ -20,8 +20,18 @@ from smtplib import SMTP
 import base64
 import logging
 
+from .auth import authorizer_from_settings
+
 
 logger = logging.getLogger(__name__)
+
+
+def connector_from_settings(settings, prefix):
+    connector_type = settings.get(prefix + 'connector')
+    logger.info('connector: %s', connector_type)
+    if connector_type == 'XOAuth2Connector':
+        return XOAuth2Connector.from_settings(settings)
+    raise ValueError(connector_type)
 
 
 class XOAuth2Connector(object):
@@ -36,6 +46,19 @@ class XOAuth2Connector(object):
         self.port = port
         self.timeout = timeout
         self.debug_smtp = debug_smtp
+
+    @classmethod
+    def from_settings(cls, settings):
+        username = settings.get('xoauth2_connector.username')
+        authorizer = authorizer_from_settings(settings, 'xoauth2_connector.')
+        hostname = settings.get('xoauth2_connector.hostname', 'smtp.gmail.com')
+        port = int(settings.get('xoauth2_connector.port', 587))
+        timeout = int(settings.get('xoauth2_connector.timeout', 10))
+        return cls(username=username,
+                   authorizer=authorizer,
+                   hostname=hostname,
+                   port=port,
+                   timeout=timeout)
 
     def __repr__(self):
         return '<XOAuth2Connector %s:%s %s>' % (

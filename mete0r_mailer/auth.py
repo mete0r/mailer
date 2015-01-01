@@ -32,10 +32,30 @@ logger = logging.getLogger(__name__)
 XOAUTH2_SCOPE = 'https://mail.google.com/'
 
 
+def authorizer_from_settings(settings, prefix):
+    authorizer_type = settings.get(prefix + 'authorizer')
+    logger.info('authorizer: %s', authorizer_type)
+    if authorizer_type == 'XOAuth2GOAuthc':
+        return XOAuth2GOAuthc.from_settings(settings)
+    elif authorizer_type == 'XOAuth2Offline':
+        return XOAuth2Offline.from_settings(settings)
+    raise ValueError(authorizer_type)
+
+
 class XOAuth2GOAuthc(object):
 
+    def __init__(self, goauthc_path='goauthc'):
+        self.goauthc_path = goauthc_path
+
+    @classmethod
+    def from_settings(cls, settings):
+        goauthc_path = settings.get('xoauth2_goauthc.goauthc_path',
+                                    'goauthc')
+        return cls(goauthc_path)
+
     def authorize(self, email):
-        cmd = ['goauthc', 'token', 'acquire', '--user', email, XOAUTH2_SCOPE]
+        cmd = [self.goauthc_path, 'token', 'acquire',
+               '--user', email, XOAUTH2_SCOPE]
         result = subprocess.check_output(cmd)
         credentials = json.loads(result)
         return credentials['access_token']
@@ -53,6 +73,15 @@ class XOAuth2Offline(object):
                 'expires_at': None,
                 'access_token': None,
             }
+
+    @classmethod
+    def from_settings(cls, settings):
+        path = settings.get('xoauth2_offline.credentials_path')
+        with file(path) as f:
+            d = json.load(f)
+        return cls(client_id=d['client_id'],
+                   client_secret=d['client_secret'],
+                   accounts=d['accounts'])
 
     def get_refresh_token(self, email):
         account = self.accounts[email]

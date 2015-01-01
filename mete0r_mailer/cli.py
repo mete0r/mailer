@@ -20,27 +20,25 @@ from contextlib import closing
 from email.header import Header
 from email.message import Message
 from email.utils import getaddresses
+import json
 import logging
 import sys
 
 from repoze.sendmail.delivery import QueuedMailDelivery
 from repoze.sendmail.queue import QueueProcessor
 
-from .auth import XOAuth2GOAuthc
-from .connector import XOAuth2Connector
+from .connector import connector_from_settings
 from .mailer import SMTPLazyConnectMailer
 
 
 logger = logging.getLogger(__name__)
 
 
-XOAUTH2_SCOPE = 'https://mail.google.com/'
-
-
 def main():
     logging.basicConfig(level=logging.INFO)
-    email = sys.argv[1]
-    connector = XOAuth2Connector(username=email, authorizer=XOAuth2GOAuthc())
+    with file(sys.argv[1]) as f:
+        settings = json.load(f)
+    connector = connector_from_settings(settings, prefix='')
     with closing(SMTPLazyConnectMailer(connector)) as mailer:
         qp = QueueProcessor(mailer, 'Maildir')
         qp.send_messages()

@@ -19,7 +19,7 @@
 from smtplib import SMTP
 import logging
 
-from .auth import authenticator_from_settings
+from .auth import auth_from_settings
 
 
 logger = logging.getLogger(__name__)
@@ -37,10 +37,10 @@ def connector_from_settings(settings, prefix):
 
 class SMTPConnector(object):
 
-    def __init__(self, hostname='localhost', port=25, authenticator=None,
+    def __init__(self, hostname='localhost', port=25, auth=None,
                  timeout=10, debug_smtp=False):
 
-        self.authenticator = authenticator
+        self.auth = auth
         self.hostname = hostname
         self.port = port
         self.timeout = timeout
@@ -48,51 +48,54 @@ class SMTPConnector(object):
 
     @classmethod
     def from_settings(cls, settings, prefix='smtp_connector.'):
-        authenticator = authenticator_from_settings(settings, prefix)
+        auth = auth_from_settings(settings, prefix)
         hostname = settings.get(prefix + 'hostname', 'localhost')
         port = int(settings.get(prefix + 'port', 25))
         timeout = int(settings.get(prefix + 'timeout', 10))
-        return cls(authenticator=authenticator,
+        return cls(auth=auth,
                    hostname=hostname,
                    port=port,
                    timeout=timeout)
 
     def __repr__(self):
         return '<%s %s:%s %s>' % (
-            type(self).__name__, self.hostname, self.port, self.authenticator)
+            type(self).__name__, self.hostname, self.port, self.auth)
 
     def connect(self):
         logger.info('%r: Connecting ...', self)
         connection = SMTP(self.hostname, str(self.port), timeout=self.timeout)
-        connection.set_debuglevel(self.debug_smtp)
+        try:
+            connection.set_debuglevel(self.debug_smtp)
 
-        # send EHLO
-        code, response = connection.ehlo()
-        if code < 200 or code >= 300:
-            code, response = connection.helo()
-            if code < 200 or code >= 300:
-                raise RuntimeError('Error sending HELO to the SMTP server '
-                                   '(code=%s, response=%s)'
-                                   % (code, response))
+            connection.ehlo_or_helo_if_needed()
+            if connection.does_esmtp:
+                logger.info('%r: EHLO resp: %s', self, connection.ehlo_resp)
 
-        if connection.has_extn('starttls'):
-            connection.starttls()
-            connection.ehlo()
+            if connection.has_extn('starttls'):
+                connection.starttls()
+                connection.ehlo()
+                logger.info('%r: EHLO resp: %s', self, connection.ehlo_resp)
 
-        if self.authenticator:
-            self.authenticator.authenticate(connection)
-        return connection
+            if self.auth:
+                self.auth.authenticate(connection)
+            return connection
+        except:
+            try:
+                connection.quit()
+            except:
+                connection.close()
+            raise
 
 
 class GMailConnector(SMTPConnector):
 
     @classmethod
     def from_settings(cls, settings, prefix='gmail_connector.'):
-        authenticator = authenticator_from_settings(settings, prefix)
+        auth = auth_from_settings(settings, prefix)
         hostname = settings.get(prefix + 'hostname', 'smtp.gmail.com')
         port = int(settings.get(prefix + 'port', 587))
         timeout = int(settings.get(prefix + 'timeout', 10))
-        return cls(authenticator=authenticator,
+        return cls(auth=auth,
                    hostname=hostname,
                    port=port,
                    timeout=timeout)

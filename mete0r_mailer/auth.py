@@ -33,18 +33,20 @@ logger = logging.getLogger(__name__)
 XOAUTH2_SCOPE = 'https://mail.google.com/'
 
 
-def authenticator_from_settings(settings, prefix):
-    authenticator = settings.get(prefix + 'authenticator')
-    child_prefix = prefix + 'authenticator.'
-    logger.info('authenticator: %s', authenticator)
-    if authenticator == 'Login':
-        return Login.from_settings(settings, child_prefix)
-    elif authenticator == 'XOAuth2':
+def auth_from_settings(settings, prefix):
+    auth = settings.get(prefix + 'auth')
+    child_prefix = prefix + 'auth.'
+    logger.info('auth: %s', auth)
+    if auth == 'None':
+        return None
+    elif auth == 'Password':
+        return Password.from_settings(settings, child_prefix)
+    elif auth == 'XOAuth2':
         return XOAuth2.from_settings(settings, child_prefix)
-    raise ValueError(authenticator)
+    raise ValueError(auth)
 
 
-class Login(object):
+class Password(object):
 
     def __init__(self, username, password):
         self.username = username

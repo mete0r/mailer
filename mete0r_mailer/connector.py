@@ -75,8 +75,9 @@ class SMTPConnector(object):
                                    '(code=%s, response=%s)'
                                    % (code, response))
 
-        connection.starttls()
-        connection.ehlo()
+        if connection.has_extn('starttls'):
+            connection.starttls()
+            connection.ehlo()
 
         if self.authenticator:
             self.authenticator.authenticate(connection)

@@ -18,6 +18,7 @@
 #
 from datetime import datetime
 from datetime import timedelta
+import base64
 import json
 import logging
 import subprocess
@@ -32,47 +33,83 @@ logger = logging.getLogger(__name__)
 XOAUTH2_SCOPE = 'https://mail.google.com/'
 
 
-def authorizer_from_settings(settings, prefix):
-    authorizer_type = settings.get(prefix + 'authorizer')
-    logger.info('authorizer: %s', authorizer_type)
-    if authorizer_type == 'XOAuth2GOAuthc':
-        return XOAuth2GOAuthc.from_settings(settings, prefix + 'authorizer.')
-    elif authorizer_type == 'XOAuth2Offline':
-        return XOAuth2Offline.from_settings(settings, prefix + 'authorizer.')
-    raise ValueError(authorizer_type)
+def authenticator_from_settings(settings, prefix):
+    authenticator = settings.get(prefix + 'authenticator')
+    child_prefix = prefix + 'authenticator.'
+    logger.info('authenticator: %s', authenticator)
+    if authenticator == 'Login':
+        return Login.from_settings(settings, child_prefix)
+    elif authenticator == 'XOAuth2GOAuthc':
+        return XOAuth2GOAuthc.from_settings(settings, child_prefix)
+    elif authenticator == 'XOAuth2Offline':
+        return XOAuth2Offline.from_settings(settings, child_prefix)
+    raise ValueError(authenticator)
 
 
-class XOAuth2GOAuthc(object):
+class Login(object):
 
-    def __init__(self, goauthc_path='goauthc'):
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+
+    @classmethod
+    def from_settings(cls, settings, prefix=''):
+        return cls(settings.get(prefix + 'username'),
+                   settings.get(prefix + 'password'))
+
+    def authenticate(self, connection):
+        connection.login(self.username, self.password)
+
+
+class XOAuth2Base(object):
+
+    email = None
+    access_token = None
+
+    def authenticate(self, connection):
+        s = make_xoauth2_string(self.email, self.access_token)
+        return connection.docmd('AUTH', 'XOAUTH2 ' + base64.b64encode(s))
+
+
+def make_xoauth2_string(username, access_token):
+    return 'user=%s\x01auth=Bearer %s\x01\x01' % (username, access_token)
+
+
+class XOAuth2GOAuthc(XOAuth2Base):
+
+    def __init__(self, email, goauthc_path='goauthc'):
+        self.email = email
         self.goauthc_path = goauthc_path
 
     @classmethod
     def from_settings(cls, settings, prefix='xoauth2_goauthc.'):
+        email = settings.get(prefix + 'email')
+        if email is None:
+            raise RuntimeError(prefix + 'email is required')
         goauthc_path = settings.get(prefix + 'goauthc_path',
                                     'goauthc')
-        return cls(goauthc_path)
+        return cls(email, goauthc_path)
 
-    def authorize(self, email):
+    @property
+    def access_token(self):
         cmd = [self.goauthc_path, 'token', 'acquire',
-               '--user', email, XOAUTH2_SCOPE]
+               '--user', self.email, XOAUTH2_SCOPE]
         result = subprocess.check_output(cmd)
         credentials = json.loads(result)
         return credentials['access_token']
 
 
-class XOAuth2Offline(object):
+class XOAuth2Offline(XOAuth2Base):
 
-    def __init__(self, client_id, client_secret, accounts):
+    def __init__(self, client_id, client_secret, email, refresh_token):
         self.client_id = client_id
         self.client_secret = client_secret
-        self.accounts = accounts
-        self.authorized = {}
-        for email in accounts:
-            self.authorized[email] = {
-                'expires_at': None,
-                'access_token': None,
-            }
+        self.email = email
+        self.refresh_token = refresh_token
+        self.authorized = {
+            'expires_at': None,
+            'access_token': None,
+        }
 
     @classmethod
     def from_settings(cls, settings, prefix='xoauth2_offline.'):
@@ -81,14 +118,12 @@ class XOAuth2Offline(object):
             d = json.load(f)
         return cls(client_id=d['client_id'],
                    client_secret=d['client_secret'],
-                   accounts=d['accounts'])
+                   email=d['email'],
+                   refresh_token=d['refresh_token'])
 
-    def get_refresh_token(self, email):
-        account = self.accounts[email]
-        return account['refresh_token']
-
-    def is_expired(self, email):
-        authorized = self.authorized[email]
+    @property
+    def is_expired(self):
+        authorized = self.authorized
         expires_at = authorized['expires_at']
         access_token = authorized['access_token']
 
@@ -96,18 +131,18 @@ class XOAuth2Offline(object):
             return True
         return expires_at < datetime.now()
 
-    def authorize(self, email):
-        if self.is_expired(email):
-            refresh_token = self.accounts[email]['refresh_token']
-            credentials = self.refresh(refresh_token)
+    @property
+    def access_token(self):
+        if self.is_expired:
+            credentials = self.refresh(self.refresh_token)
             logger.info('credentials: %s',
                         json.dumps(credentials, sort_keys=True, indent=2))
             expires_in = int(credentials['expires_in'])
-            self.authorized[email] = {
+            self.authorized = {
                 'access_token': credentials['access_token'],
                 'expires_at': datetime.now() + timedelta(seconds=expires_in),
             }
-        return self.authorized[email]['access_token']
+        return self.authorized['access_token']
 
     def refresh(self, refresh_token):
         endpoint = 'https://accounts.google.com/o/oauth2/token'

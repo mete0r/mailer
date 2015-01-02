@@ -17,52 +17,49 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 from smtplib import SMTP
-import base64
 import logging
 
-from .auth import authorizer_from_settings
+from .auth import authenticator_from_settings
 
 
 logger = logging.getLogger(__name__)
 
 
 def connector_from_settings(settings, prefix):
-    connector_type = settings.get(prefix + 'connector')
-    logger.info('connector: %s', connector_type)
-    if connector_type == 'XOAuth2Connector':
-        return XOAuth2Connector.from_settings(settings, prefix + 'connector.')
-    raise ValueError(connector_type)
+    connector = settings.get(prefix + 'connector')
+    logger.info('connector: %s', connector)
+    if connector == 'SMTPConnector':
+        return SMTPConnector.from_settings(settings, prefix + 'connector.')
+    elif connector == 'GMailConnector':
+        return GMailConnector.from_settings(settings, prefix + 'connector.')
+    raise ValueError(connector)
 
 
-class XOAuth2Connector(object):
+class SMTPConnector(object):
 
-    def __init__(self, username, authorizer,
-                 hostname='smtp.gmail.com', port=587, timeout=10,
-                 debug_smtp=False):
+    def __init__(self, hostname='localhost', port=25, authenticator=None,
+                 timeout=10, debug_smtp=False):
 
-        self.username = username
-        self.authorizer = authorizer
+        self.authenticator = authenticator
         self.hostname = hostname
         self.port = port
         self.timeout = timeout
         self.debug_smtp = debug_smtp
 
     @classmethod
-    def from_settings(cls, settings, prefix='xoauth2_connector.'):
-        username = settings.get(prefix + 'username')
-        authorizer = authorizer_from_settings(settings, prefix)
-        hostname = settings.get(prefix + 'hostname', 'smtp.gmail.com')
-        port = int(settings.get(prefix + 'port', 587))
+    def from_settings(cls, settings, prefix='smtp_connector.'):
+        authenticator = authenticator_from_settings(settings, prefix)
+        hostname = settings.get(prefix + 'hostname', 'localhost')
+        port = int(settings.get(prefix + 'port', 25))
         timeout = int(settings.get(prefix + 'timeout', 10))
-        return cls(username=username,
-                   authorizer=authorizer,
+        return cls(authenticator=authenticator,
                    hostname=hostname,
                    port=port,
                    timeout=timeout)
 
     def __repr__(self):
-        return '<XOAuth2Connector %s:%s %s>' % (
-            self.hostname, self.port, self.username)
+        return '<%s %s:%s %s>' % (
+            type(self).__name__, self.hostname, self.port, self.authenticator)
 
     def connect(self):
         logger.info('%r: Connecting ...', self)
@@ -81,11 +78,20 @@ class XOAuth2Connector(object):
         connection.starttls()
         connection.ehlo()
 
-        access_token = self.authorizer.authorize(self.username)
-        s = make_xoauth2_string(self.username, access_token)
-        connection.docmd('AUTH', 'XOAUTH2 ' + base64.b64encode(s))
+        if self.authenticator:
+            self.authenticator.authenticate(connection)
         return connection
 
 
-def make_xoauth2_string(username, access_token):
-    return 'user=%s\x01auth=Bearer %s\x01\x01' % (username, access_token)
+class GMailConnector(SMTPConnector):
+
+    @classmethod
+    def from_settings(cls, settings, prefix='gmail_connector.'):
+        authenticator = authenticator_from_settings(settings, prefix)
+        hostname = settings.get(prefix + 'hostname', 'smtp.gmail.com')
+        port = int(settings.get(prefix + 'port', 587))
+        timeout = int(settings.get(prefix + 'timeout', 10))
+        return cls(authenticator=authenticator,
+                   hostname=hostname,
+                   port=port,
+                   timeout=timeout)

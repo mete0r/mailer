@@ -19,13 +19,9 @@
 from datetime import datetime
 from datetime import timedelta
 import json
-import logging
 import urllib
 
 import requests
-
-
-logger = logging.getLogger(__name__)
 
 
 class Offline(object):
@@ -63,8 +59,6 @@ class Offline(object):
     def authorize(self):
         if self.is_expired:
             credentials = self.refresh(self.refresh_token)
-            logger.info('credentials: %s',
-                        json.dumps(credentials, sort_keys=True, indent=2))
             expires_in = int(credentials['expires_in'])
             self.authorized = {
                 'access_token': credentials['access_token'],
@@ -80,9 +74,6 @@ class Offline(object):
             'client_secret': self.client_secret,
             'refresh_token': refresh_token
         }
-
-        logger.info('google refresh_token query: %s',
-                    json.dumps(query, indent=2, sort_keys=True))
 
         query = urllib.urlencode(query)
         r = requests.post(endpoint, data=query, headers={

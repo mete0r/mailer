@@ -38,13 +38,18 @@ class Offline(object):
 
     @classmethod
     def from_settings(cls, settings, prefix='xoauth2_offline.'):
-        path = settings.get(prefix + 'credentials_path')
-        with file(path) as f:
-            d = json.load(f)
-        return cls(client_id=d['client_id'],
-                   client_secret=d['client_secret'],
-                   email=d['email'],
-                   refresh_token=d['refresh_token'])
+        email = settings.get(prefix + 'email')
+        client_secret_path = settings.get(prefix + 'client_secret_path')
+        with file(client_secret_path) as f:
+            client_credentials = json.load(f)
+            client_credentials = client_credentials.values()[0]
+        refresh_token_path = settings.get(prefix + 'refresh_token_path')
+        with file(refresh_token_path) as f:
+            token_credentials = json.load(f)
+        return cls(client_id=client_credentials['client_id'],
+                   client_secret=client_credentials['client_secret'],
+                   email=email,
+                   refresh_token=token_credentials['refresh_token'])
 
     @property
     def is_expired(self):

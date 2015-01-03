@@ -30,16 +30,13 @@ logger = logging.getLogger(__name__)
 def delivery_from_settings(settings, prefix):
     delivery = settings.get(prefix + 'delivery')
     if delivery == 'direct':
-        return direct_delivery_from_settings(settings, prefix +
-                                             'delivery.direct.')
+        return direct_delivery_from_settings(settings, prefix + 'delivery.')
     elif delivery == 'queued':
-        return queued_delivery_from_settings(settings, prefix +
-                                             'delivery.queued.')
+        return queued_delivery_from_settings(settings, prefix + 'delivery.')
 
 
 def direct_delivery_from_settings(settings, prefix=''):
-    mailer = SMTPConnectMailer.from_settings(settings, prefix +
-                                             'mailer.')
+    mailer = SMTPConnectMailer.from_settings(settings, prefix + 'mailer.')
     return DirectMailDelivery(mailer)
 
 

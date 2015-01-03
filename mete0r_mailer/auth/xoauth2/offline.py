@@ -56,7 +56,7 @@ class Offline(object):
             return True
         return expires_at < datetime.now()
 
-    def authorize(self):
+    def get_credentials(self):
         if self.is_expired:
             credentials = self.refresh(self.refresh_token)
             expires_in = int(credentials['expires_in'])

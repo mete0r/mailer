@@ -24,16 +24,16 @@ XOAUTH2_SCOPE = 'https://mail.google.com/'
 
 class XOAuth2(object):
 
-    def __init__(self, authorizer):
-        self.authorizer = authorizer
+    def __init__(self, credentials_provider):
+        self.credentials_provider = credentials_provider
 
     @classmethod
     def from_settings(cls, settings, prefix):
-        authorizer = authorizer_from_settings(settings, prefix)
-        return cls(authorizer=authorizer)
+        credentials_provider = credentials_from_settings(settings, prefix)
+        return cls(credentials_provider=credentials_provider)
 
     def authenticate(self, connection):
-        email, access_token = self.authorizer.authorize()
+        email, access_token = self.credentials_provider.get_credentials()
         s = make_xoauth2_string(email, access_token)
         return connection.docmd('AUTH', 'XOAUTH2 ' + base64.b64encode(s))
 
@@ -42,13 +42,13 @@ def make_xoauth2_string(username, access_token):
     return 'user=%s\x01auth=Bearer %s\x01\x01' % (username, access_token)
 
 
-def authorizer_from_settings(settings, prefix):
-    authorizer = settings.get(prefix + 'authorizer')
-    prefix += 'authorizer.'
-    if authorizer == 'offline':
+def credentials_from_settings(settings, prefix):
+    credentials_provider = settings.get(prefix + 'credentials')
+    prefix += 'credentials.'
+    if credentials_provider == 'offline':
         from .offline import Offline
         return Offline.from_settings(settings, prefix)
-    elif authorizer == 'goauthc':
+    elif credentials_provider == 'goauthc':
         from .goauthc import GOAuthc
         return GOAuthc.from_settings(settings, prefix)
-    raise ValueError(authorizer)
+    raise ValueError(credentials_provider)

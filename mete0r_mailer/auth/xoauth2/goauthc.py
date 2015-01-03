@@ -37,7 +37,7 @@ class GOAuthc(object):
                                     'goauthc')
         return cls(email, goauthc_path)
 
-    def authorize(self):
+    def get_credentials(self):
         cmd = [self.goauthc_path, 'token', 'acquire',
                '--user', self.email, XOAUTH2_SCOPE]
         result = subprocess.check_output(cmd)
